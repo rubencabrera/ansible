@@ -37,10 +37,12 @@
             "Action": [
                 "ec2:AllocateAddress",
                 "ec2:AssociateAddress",
+                "ec2:AssociateDhcpOptions",
                 "ec2:AssociateRouteTable",
                 "ec2:AssociateVpcCidrBlock",
                 "ec2:AssociateSubnetCidrBlock",
                 "ec2:AttachInternetGateway",
+                "ec2:CreateDhcpOptions",
                 "ec2:CreateImage",
                 "ec2:CreateInternetGateway",
                 "ec2:CreateKeyPair",
@@ -52,6 +54,7 @@
                 "ec2:CreateSubnet",
                 "ec2:CreateTags",
                 "ec2:CreateVpc",
+                "ec2:DeleteDhcpOptions",
                 "ec2:DeleteInternetGateway",
                 "ec2:DeleteKeyPair",
                 "ec2:DeleteNatGateway",
@@ -128,10 +131,14 @@
             "Effect": "Allow",
             "Action": [
                 "elasticloadbalancing:ConfigureHealthCheck",
+                "elasticloadbalancing:CreateListener",
                 "elasticloadbalancing:CreateLoadBalancer",
                 "elasticloadbalancing:CreateLoadBalancerListeners",
+                "elasticloadbalancing:CreateTargetGroup",
+                "elasticloadbalancing:DeleteListener",
                 "elasticloadbalancing:DeleteLoadBalancer",
                 "elasticloadbalancing:DeleteLoadBalancerListeners",
+                "elasticloadbalancing:DeleteTargetGroup",
                 "elasticloadbalancing:DeregisterInstancesFromLoadBalancer",
                 "elasticloadbalancing:DescribeInstanceHealth",
                 "elasticloadbalancing:DescribeLoadBalancerAttributes",
@@ -209,14 +216,39 @@
             "Resource": "arn:aws:lambda:{{aws_region}}:{{aws_account}}:function:*"
         },
         {
-            "Sid": "AllowLambdaRoleManagement",
+            "Sid": "AllowRoleManagement",
             "Effect": "Allow",
             "Action": [
                 "iam:PassRole"
             ],
             "Resource": [
-                "arn:aws:iam::{{aws_account}}:role/ansible_lambda_role"
+                "arn:aws:iam::{{aws_account}}:role/ansible_lambda_role",
+                "arn:aws:iam::{{aws_account}}:role/ecsInstanceRole",
+                "arn:aws:iam::{{aws_account}}:role/ecsServiceRole"
             ]
+        },
+        {
+          "Sid": "AllowECSManagement",
+          "Effect": "Allow",
+          "Action": [
+            "application-autoscaling:Describe*",
+            "application-autoscaling:PutScalingPolicy",
+            "application-autoscaling:RegisterScalableTarget",
+            "cloudwatch:DescribeAlarms",
+            "cloudwatch:PutMetricAlarm",
+            "ecs:CreateCluster",
+            "ecs:CreateService",
+            "ecs:DeleteCluster",
+            "ecs:DeleteService",
+            "ecs:Describe*",
+            "ecs:DeregisterTaskDefinition",
+            "ecs:List*",
+            "ecs:RegisterTaskDefinition",
+            "ecs:UpdateService"
+          ],
+          "Resource": [
+            "*"
+          ]
         }
     ]
 }

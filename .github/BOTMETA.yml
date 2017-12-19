@@ -268,6 +268,8 @@ files:
   $modules/cloud/packet/:
   $modules/cloud/profitbricks/: baldwinSPC
   $modules/cloud/pubnub/pubnub_blocks.py: parfeon pubnub
+  $modules/cloud/rackspace/:
+    ignored: sivel angstwad
   $modules/cloud/rackspace/rax_cdb.py: jails
   $modules/cloud/rackspace/rax_cdb_database.py: jails
   $modules/cloud/rackspace/rax_cdb_user.py: jails
@@ -427,6 +429,7 @@ files:
   $modules/monitoring/zabbix/zabbix_hostmacro.py: cave
   $modules/monitoring/zabbix/zabbix_maintenance.py: abulimov
   $modules/monitoring/zabbix/zabbix_screen.py: cove harrisongu
+  $modules/monitoring/zabbix/zabbix_template.py: eikef Logan2211 sookido
   $modules/net_tools/basics/get_url.py: jpmens
   $modules/net_tools/basics/slurp.py: $team_ansible
   $modules/net_tools/basics/uri.py: $team_ansible
@@ -528,7 +531,9 @@ files:
     maintainers: shane-walker
   $modules/packaging/language/pear.py:
   $modules/packaging/language/pip.py: lujeni robinro
-  $modules/packaging/os/apk.py: kbrebanov tdtrask
+  $modules/packaging/os/apk.py:
+    ignored: kbrebanov
+    maintainers: tdtrask
   $modules/packaging/os/apt.py: $team_ansible mgwilliams
   $modules/packaging/os/apt_key.py: jvantuyl
   $modules/packaging/os/apt_repository.py: $team_ansible sashka
@@ -543,7 +548,9 @@ files:
   $modules/packaging/os/openbsd_pkg.py: eest
   $modules/packaging/os/opkg.py: skinp
   $modules/packaging/os/package.py: $team_ansible
-  $modules/packaging/os/pacman.py: indrajitr
+  $modules/packaging/os/pacman.py:
+    ignored: elasticdog
+    maintainers: indrajitr
   $modules/packaging/os/pkg5.py: mavit
   $modules/packaging/os/pkg5_publisher.py: mavit
   $modules/packaging/os/pkgin.py: L2G jasperla szinck troy2914
@@ -695,7 +702,9 @@ files:
   $modules/web_infrastructure/rundeck_project.py: nerzhul
   $modules/web_infrastructure/supervisorctl.py: inetfuture mattupstate
   $modules/web_infrastructure/taiga_issue.py: lekum
-  $modules/windows/: $team_windows
+  $modules/windows/:
+    maintainers: $team_windows
+    ignored: angstwad
   $modules/windows/async_status.ps1: $team_windows
   $modules/windows/async_wrapper.ps1: $team_windows
   $modules/windows/setup.ps1: $team_ansible
@@ -1166,6 +1175,8 @@ files:
     labels:
     - networking
     - nxos
+  test/integration/targets/setup_zabbix:
+    maintainers: eikef D3DeFi
   test/units/modules/network:
     maintainers: $team_networking
     labels: networking
@@ -1179,7 +1190,7 @@ files:
 macros:
   module_utils: lib/ansible/module_utils
   modules: lib/ansible/modules
-  team_aci: dagwieers jmcgill298 schunduri
+  team_aci: brunocalogero dagwieers jmcgill298 schunduri
   team_ansible: []
   team_avi: ericsysmin grastogi23 khaltore
   team_azure: haroldwongms nitzmahone tstringer yuwzho xscript zikalino

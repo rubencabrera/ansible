@@ -22,7 +22,7 @@
     port: 443
     state: started
 
-- name: get a list of VMS from vcsim   
+- name: get a list of VMS from vcsim
   uri:
     url: http://{{ vcsim }}:5000/govc_find?filter=VM
   register: vmlist
@@ -46,6 +46,12 @@
         memory_mb: 512
         hotadd_memory: true
         hotadd_cpu: false
+        # vcsim does not support this changes so commenting
+        # till the time.
+        # memory_reservation: 512
+        # memory_reservation_lock: False
+        # nested_virt: True
+        max_connections: 10
     disk:
         - size: 0gb
           type: thin

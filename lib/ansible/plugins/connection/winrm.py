@@ -75,6 +75,10 @@ DOCUMENTATION = """
             - kerberos usage mode.
             - The managed option means Ansible will obtain kerberos ticket.
             - While the manual one means a ticket must already have been obtained by the user.
+            - If having issues with Ansible freezing when trying to obtain the
+              Kerberos ticket, you can either set this to C(manual) and obtain
+              it outside Ansible or install C(pexpect) through pip and try
+              again.
         choices: [managed, manual]
         vars:
           - name: ansible_winrm_kinit_mode
@@ -110,7 +114,6 @@ except ImportError:
 
 from ansible.errors import AnsibleError, AnsibleConnectionFailure
 from ansible.errors import AnsibleFileNotFound
-from ansible.module_utils.six import string_types
 from ansible.module_utils.six.moves.urllib.parse import urlunsplit
 from ansible.module_utils._text import to_bytes, to_native, to_text
 from ansible.module_utils.six import binary_type
@@ -134,6 +137,12 @@ try:
 except ImportError as e:
     HAS_XMLTODICT = False
     XMLTODICT_IMPORT_ERR = e
+
+try:
+    import pexpect
+    HAS_PEXPECT = True
+except ImportError as e:
+    HAS_PEXPECT = False
 
 try:
     from __main__ import display
@@ -239,20 +248,45 @@ class Connection(ConnectionBase):
     def _kerb_auth(self, principal, password):
         if password is None:
             password = ""
+
         self._kerb_ccache = tempfile.NamedTemporaryFile()
         display.vvvvv("creating Kerberos CC at %s" % self._kerb_ccache.name)
         krb5ccname = "FILE:%s" % self._kerb_ccache.name
-        krbenv = dict(KRB5CCNAME=krb5ccname)
         os.environ["KRB5CCNAME"] = krb5ccname
-        kinit_cmdline = [self._kinit_cmd, principal]
+        krb5env = dict(KRB5CCNAME=krb5ccname)
 
-        display.vvvvv("calling kinit for principal %s" % principal)
-        p = subprocess.Popen(kinit_cmdline, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=krbenv)
+        # pexpect runs the process in its own pty so it can correctly send
+        # the password as input even on MacOS which blocks subprocess from
+        # doing so. Unfortunately it is not available on the built in Python
+        # so we can only use it if someone has installed it
+        if HAS_PEXPECT:
+            kinit_cmdline = "%s %s" % (self._kinit_cmd, principal)
+            password = to_text(password, encoding='utf-8',
+                               errors='surrogate_or_strict')
 
-        # TODO: unicode/py3
-        stdout, stderr = p.communicate(password + b'\n')
+            display.vvvv("calling kinit with pexpect for principal %s"
+                         % principal)
+            events = {
+                ".*:": password + "\n"
+            }
+            # technically this is the stdout but to match subprocess we wil call
+            # it stderr
+            stderr, rc = pexpect.run(kinit_cmdline, withexitstatus=True, events=events, env=krb5env, timeout=60)
+        else:
+            kinit_cmdline = [self._kinit_cmd, principal]
+            password = to_bytes(password, encoding='utf-8',
+                                errors='surrogate_or_strict')
 
-        if p.returncode != 0:
+            display.vvvv("calling kinit with subprocess for principal %s"
+                         % principal)
+            p = subprocess.Popen(kinit_cmdline, stdin=subprocess.PIPE,
+                                 stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE,
+                                 env=krb5env)
+            stdout, stderr = p.communicate(password + b'\n')
+            rc = p.returncode != 0
+
+        if rc != 0:
             raise AnsibleConnectionFailure("Kerberos auth failure: %s" % stderr.strip())
 
         display.vvvvv("kinit succeeded for principal %s" % principal)
@@ -571,23 +605,29 @@ class Connection(ConnectionBase):
             while True:
                 try:
                     script = '''
-                        If (Test-Path -PathType Leaf "%(path)s")
+                        $path = "%(path)s"
+                        If (Test-Path -Path $path -PathType Leaf)
                         {
-                            $stream = New-Object IO.FileStream("%(path)s", [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [IO.FileShare]::ReadWrite);
-                            $stream.Seek(%(offset)d, [System.IO.SeekOrigin]::Begin) | Out-Null;
-                            $buffer = New-Object Byte[] %(buffer_size)d;
-                            $bytesRead = $stream.Read($buffer, 0, %(buffer_size)d);
-                            $bytes = $buffer[0..($bytesRead-1)];
-                            [System.Convert]::ToBase64String($bytes);
-                            $stream.Close() | Out-Null;
+                            $buffer_size = %(buffer_size)d
+                            $offset = %(offset)d
+
+                            $stream = New-Object -TypeName IO.FileStream($path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+                            $stream.Seek($offset, [System.IO.SeekOrigin]::Begin) > $null
+                            $buffer = New-Object -TypeName byte[] $buffer_size
+                            $bytes_read = $stream.Read($buffer, 0, $buffer_size)
+                            if ($bytes_read -gt 0) {
+                                $bytes = $buffer[0..($bytes_read - 1)]
+                                [System.Convert]::ToBase64String($bytes)
+                            }
+                            $stream.Close() > $null
                         }
-                        ElseIf (Test-Path -PathType Container "%(path)s")
+                        ElseIf (Test-Path -Path $path -PathType Container)
                         {
                             Write-Host "[DIR]";
                         }
                         Else
                         {
-                            Write-Error "%(path)s does not exist";
+                            Write-Error "$path does not exist";
                             Exit 1;
                         }
                     ''' % dict(buffer_size=buffer_size, path=self._shell._escape(in_path), offset=offset)

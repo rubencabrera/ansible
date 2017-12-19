@@ -29,7 +29,7 @@ DOCUMENTATION = """
       remote_user:
         description:
             - User to login/authenticate as
-            - Can be set from the CLI via the ``--user`` or ``-u`` options.
+            - Can be set from the CLI via the C(--user) or C(-u) options.
         vars:
             - name: ansible_user
             - name: ansible_ssh_user
@@ -47,7 +47,7 @@ DOCUMENTATION = """
       password:
         description:
           - Secret used to either login the ssh server or as a passphrase for ssh keys that require it
-          - Can be set from the CLI via the ``--ask-pass`` option.
+          - Can be set from the CLI via the C(--ask-pass) option.
         vars:
             - name: ansible_password
             - name: ansible_ssh_pass
@@ -414,7 +414,7 @@ class Connection(ConnectionBase):
                     if self._play_context.become and self._play_context.become_pass:
                         chan.sendall(to_bytes(self._play_context.become_pass) + b'\n')
                     else:
-                        raise AnsibleError("A password is reqired but none was supplied")
+                        raise AnsibleError("A password is required but none was supplied")
                 else:
                     no_prompt_out += become_output
                     no_prompt_err += become_output

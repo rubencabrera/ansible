@@ -144,6 +144,21 @@ def find_datacenter_by_name(content, datacenter_name):
     return None
 
 
+def get_parent_datacenter(obj):
+    """ Walk the parent tree to find the objects datacenter """
+    if isinstance(obj, vim.Datacenter):
+        return obj
+    datacenter = None
+    while True:
+        if not hasattr(obj, 'parent'):
+            break
+        obj = obj.parent
+        if isinstance(obj, vim.Datacenter):
+            datacenter = obj
+            break
+    return datacenter
+
+
 def find_datastore_by_name(content, datastore_name):
 
     datastores = get_all_objs(content, [vim.Datastore])
@@ -220,14 +235,6 @@ def find_vm_by_name(content, vm_name, folder=None, recurse=True):
     for vm in vms:
         if vm.name == vm_name:
             return vm
-    return None
-
-
-def find_host_portgroup_by_name(host, portgroup_name):
-
-    for portgroup in host.config.network.portgroup:
-        if portgroup.spec.name == portgroup_name:
-            return portgroup
     return None
 
 
@@ -324,19 +331,7 @@ def gather_vm_facts(content, vm):
     except:
         pass
 
-    folder = vm.parent
-    if folder:
-        foldername = folder.name
-        fp = folder.parent
-        # climb back up the tree to find our path, stop before the root folder
-        while fp is not None and fp.name is not None and fp != content.rootFolder:
-            foldername = fp.name + '/' + foldername
-            try:
-                fp = fp.parent
-            except:
-                break
-        foldername = '/' + foldername
-        facts['hw_folder'] = foldername
+    facts['hw_folder'] = PyVmomi.get_vm_path(content, vm)
 
     cfm = content.customFieldsManager
     # Resolve custom values
@@ -454,10 +449,10 @@ def connect_to_api(module, disconnect_atexit=True):
 
     if validate_certs and not hasattr(ssl, 'SSLContext'):
         module.fail_json(msg='pyVim does not support changing verification mode with python < 2.7.9. Either update '
-                             'python or or use validate_certs=false')
+                             'python or use validate_certs=false.')
 
     ssl_context = None
-    if not validate_certs:
+    if not validate_certs and hasattr(ssl, 'SSLContext'):
         ssl_context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
         ssl_context.verify_mode = ssl.CERT_NONE
 
@@ -813,6 +808,25 @@ class PyVmomi(object):
         self.current_vm_obj = None
         self.content = connect_to_api(self.module)
 
+    def is_vcenter(self):
+        """
+        Check if given hostname is vCenter or ESXi host
+        Returns: True if given connection is with vCenter server
+                 False if given connection is with ESXi server
+
+        """
+        api_type = None
+        try:
+            api_type = self.content.about.apiType
+        except (vmodl.RuntimeFault, vim.fault.VimFault) as exc:
+            self.module.fail_json(msg="Failed to get status of vCenter server : %s" % exc.msg)
+
+        if api_type == 'VirtualCenter':
+            return True
+        elif api_type == 'HostAgent':
+            return False
+
+    # Virtual Machine related functions
     def get_vm(self):
         vm = None
         match_first = (self.params['name_match'] == 'first')
@@ -830,3 +844,77 @@ class PyVmomi(object):
 
     def gather_facts(self, vm):
         return gather_vm_facts(self.content, vm)
+
+    @staticmethod
+    def get_vm_path(content, vm):
+        foldername = None
+        folder = vm.parent
+        if folder:
+            foldername = folder.name
+            fp = folder.parent
+            # climb back up the tree to find our path, stop before the root folder
+            while fp is not None and fp.name is not None and fp != content.rootFolder:
+                foldername = fp.name + '/' + foldername
+                try:
+                    fp = fp.parent
+                except:
+                    break
+            foldername = '/' + foldername
+        return foldername
+
+    # Cluster related functions
+    def find_cluster_by_name(self, cluster_name, datacenter_name=None):
+        """
+        Find Cluster by name in given datacenter
+        Args:
+            cluster_name: Name of cluster name to find
+            datacenter_name: (optional) Name of datacenter
+
+        Returns: True if found
+
+        """
+        return find_cluster_by_name(self.content, cluster_name, datacenter=datacenter_name)
+
+    def get_all_hosts_by_cluster(self, cluster_name):
+        """
+        Get all hosts from cluster by cluster name
+        Args:
+            cluster_name: Name of cluster
+
+        Returns: List of hosts
+
+        """
+        cluster_obj = self.find_cluster_by_name(cluster_name=cluster_name)
+        if cluster_obj:
+            return [host for host in cluster_obj.host]
+        else:
+            return []
+
+    # Hosts related functions
+    def find_hostsystem_by_name(self, host_name):
+        """
+        Find Host by name
+        Args:
+            host_name: Name of ESXi host
+
+        Returns: True if found
+
+        """
+        return find_hostsystem_by_name(self.content, hostname=host_name)
+
+    # Network related functions
+    @staticmethod
+    def find_host_portgroup_by_name(host, portgroup_name):
+        """
+        Find Portgroup on given host
+        Args:
+            host: Host config object
+            portgroup_name: Name of portgroup
+
+        Returns: True if found else False
+
+        """
+        for portgroup in host.config.network.portgroup:
+            if portgroup.spec.name == portgroup_name:
+                return portgroup
+        return False

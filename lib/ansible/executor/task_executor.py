@@ -726,7 +726,7 @@ class TaskExecutor:
 
         conn_type = self._play_context.connection
 
-        connection = self._shared_loader_obj.connection_loader.get(conn_type, self._play_context, self._new_stdin)
+        connection = self._shared_loader_obj.connection_loader.get(conn_type, self._play_context, self._new_stdin, ansible_playbook_pid=to_text(os.getppid()))
         if not connection:
             raise AnsibleError("the connection plugin '%s' was not found" % conn_type)
 
@@ -800,7 +800,7 @@ class TaskExecutor:
         Starts the persistent connection
         '''
         master, slave = pty.openpty()
-        p = subprocess.Popen(["ansible-connection"], stdin=slave, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        p = subprocess.Popen(["ansible-connection", to_text(os.getppid())], stdin=slave, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdin = os.fdopen(master, 'wb', 0)
         os.close(slave)
 
@@ -818,9 +818,9 @@ class TaskExecutor:
         stdin.close()
 
         if p.returncode == 0:
-            result = json.loads(stdout)
+            result = json.loads(to_text(stdout))
         else:
-            result = json.loads(stderr)
+            result = json.loads(to_text(stderr))
 
         if 'messages' in result:
             for msg in result.get('messages'):

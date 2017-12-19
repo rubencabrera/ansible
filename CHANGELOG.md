@@ -8,7 +8,7 @@ Ansible Changes By Release
 ### Major Changes
 * Removed the previously deprecated 'accelerate' mode and all associated keywords and code.
 * New simpler and more intuitive 'loop' keyword for task loops. The ``with_<lookup>`` loops will be deprecated in the near future and eventually removed.
-* Added fact namespacing, from now on facts will be available under `ansible_facts` namespace (i.e. `ansible_facts.os_distribution`) w/o the `ansilbe_` prefix.
+* Added fact namespacing, from now on facts will be available under `ansible_facts` namespace (i.e. `ansible_facts.os_distribution`) w/o the `ansible_` prefix.
   They will continue to be added into the main namespace directly, but now with a configuration toggle to enable this,
   currently on by default, in the future it will be off.
 
@@ -16,8 +16,9 @@ Ansible Changes By Release
 * Previously deprecated 'hostfile' config settings have been 're-deprecated' as previously code did not warn about deprecated configuration settings.
 * Using Ansible provided Jinja tests as filters is deprecated and will be removed in Ansible 2.9
 * `stat` and `win_stat` have deprecated `get_md5` and the `md5` return value
-  and these options will be removed in Ansible 2.9. `get_md5: no` will still be
-  allowed in 2.9 but will finally be removed 2 versions after that.
+  and these options will become undocumented in Ansible 2.9 and removed in a
+  later version.
+* The `redis_kv` lookup in favor of new `redis` lookup
 
 ### Minor Changes
 * added a few new magic vars corresponding to configuration/command line options:
@@ -35,9 +36,10 @@ Ansible Changes By Release
   in the `md5` return value not being returned. This option will be removed altogether in Ansible
   2.9. use `get_checksum: True` with `checksum_algorithm: md5` to return an md5 hash of the file
   under the `checksum` return value.
+* `osx_say` module was renamed into `say`.
 
 #### Deprecated Modules (to be removed in 2.9):
-* ec2_ami_find
+* ec2_ami_find: replaced by ec2_ami_facts
 
 #### Removed Modules (previously deprecated):
 * accelerate
@@ -51,6 +53,7 @@ Ansible Changes By Release
 * aws_ssm: Query AWS ssm data
 * config: Lookup Ansible settings
 * openshift: Return info from Openshift installation
+* redis: look up date from Redis DB, deprecates the redis_kv one.
 
 ## Callbacks
 * yaml
@@ -64,13 +67,17 @@ Ansible Changes By Release
 * aws_ssm_parameter_store
 * digital_ocean_sshkey_facts
 * ec2_ami_facts
+* ec2_placement_group
 * ecs_taskdefinition_facts
 * elasticache_facts
+* iam_role_facts
 
 #### Windows
 
-  * win_scheduled_task_stat
+  * win_audit_policy_system
   * win_audit_rule
+  * win_scheduled_task_stat
+  * win_whoami
 
 <a id="2.4.1"></a>
 
@@ -242,7 +249,7 @@ Ansible Changes By Release
   - New configuration option to list enabled plugins and precedence order `[inventory]enable_plugins` in ansible.cfg
   - vars_plugins have been reworked, they are now run from Vars manager and API has changed (need docs)
   - Loading group_vars/host_vars is now a vars plugin and can be overridden
-  - It is now possible to specify mulitple inventory sources in the command line (-i /etc/hosts1 -i /opt/hosts2)
+  - It is now possible to specify multiple inventory sources in the command line (-i /etc/hosts1 -i /opt/hosts2)
   - Inventory plugins can use the cache plugin (i.e. virtualbox) and is affected by `meta: refresh_inventory`
   - Group variable precedence is now configurable via new 'precedence' option in ansible.cfg (needs docs)
   - Improved warnings and error messages across the board
@@ -341,14 +348,14 @@ Ansible Changes By Release
   so they may want to base their efforts off the code we were using:
     * https://github.com/ansible/ansible/blob/2fff690caab6a1c6a81973f704be3fbd0bde2c2f/lib/ansible/module_utils/six/__init__.py
 * Update ipaddr Jinja filters to replace existing non RFC compliant ones. Added additional filters for easier use
-  of handling IP addresses. (PR# 26566)
+  of handling IP addresses. (PR #26566)
 * datetime filter updated to use default format of datetime.datetime (ISO8601)
 * The junit plugin now has an option to report a junit test failure on changes for idempotent testing.
 * New 'diff' keyword allows setting diff mode on playbook objects, overriding command line option and config.
 * New config settings for inventory to:
 	- control inventory plugins used
     - extensions of files to ignore when using inventory directory
-	- patterns of flies to ignore when using inventory directory
+	- patterns of files to ignore when using inventory directory
 	- option to toggle failed inventory source parsing between an error or a warning
 * More fixes for Python 3 across the code base.
 * win_shell and win_command modules now properly preserve quoted arguments passed on the command-line. Tasks that attempted to work around the issue by adding extra quotes/escaping may need to be reworked. See https://github.com/ansible/ansible/issues/23019 for additional detail.
@@ -378,8 +385,8 @@ Ansible Changes By Release
 - lxd
 
 #### New: Tests
-- any : true if any element is true
-- all: true if all elements are true
+- `any`: true if any element is true
+- `all`: true if all elements are true
 
 ### Module Notes
 - The docker_container module has gained a new option, `working_dir` which allows

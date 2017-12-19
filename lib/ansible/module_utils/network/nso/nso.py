@@ -25,6 +25,13 @@ from ansible.module_utils.urls import open_url
 import json
 import re
 
+try:
+    unicode
+    HAVE_UNICODE = True
+except NameError:
+    unicode = str
+    HAVE_UNICODE = False
+
 
 nso_argument_spec = dict(
     url=dict(required=True),
@@ -407,7 +414,7 @@ class ValueBuilder(object):
         parent_schema = all_schema['data']
         meta = all_schema['meta']
 
-        schema = self._get_child(parent_schema, key)
+        schema = self._find_child(parent_path, parent_schema, key)
         if self._is_leaf(schema):
             path_type = schema['type']
             if path_type.get('primitive', False):
@@ -443,11 +450,20 @@ class ValueBuilder(object):
     def _get_choice_child(self, schema, qname):
         name_key = ':' in qname and 'qname' or 'name'
         for child_case in schema['cases']:
+            # look for direct child
             choice_child_schema = next(
                 (c for c in child_case['children']
                  if c.get(name_key, None) == qname), None)
             if choice_child_schema is not None:
                 return choice_child_schema
+
+            # look for nested choice
+            for child_schema in child_case['children']:
+                if child_schema['kind'] != 'choice':
+                    continue
+                choice_child_schema = self._get_choice_child(child_schema, qname)
+                if choice_child_schema is not None:
+                    return choice_child_schema
         return None
 
     def _is_leaf(self, schema):
@@ -475,3 +491,66 @@ def verify_version(client):
             (version[1] == 4 and (len(version) < 3 or version[2] < 3))):
         raise ModuleFailException(
             'unsupported NSO version {0}, only 4.4.3 or later is supported'.format(version_str))
+
+
+def normalize_value(expected_value, value, key):
+    if value is None:
+        return None
+    if isinstance(expected_value, bool):
+        return value == 'true'
+    if isinstance(expected_value, int):
+        try:
+            return int(value)
+        except TypeError:
+            raise ModuleFailException(
+                'returned value {0} for {1} is not a valid integer'.format(
+                    key, value))
+    if isinstance(expected_value, float):
+        try:
+            return float(value)
+        except TypeError:
+            raise ModuleFailException(
+                'returned value {0} for {1} is not a valid float'.format(
+                    key, value))
+    if isinstance(expected_value, (list, tuple)):
+        if not isinstance(value, (list, tuple)):
+            raise ModuleFailException(
+                'returned value {0} for {1} is not a list'.format(value, key))
+        if len(expected_value) != len(value):
+            raise ModuleFailException(
+                'list length mismatch for {0}'.format(key))
+
+        normalized_value = []
+        for i in range(len(expected_value)):
+            normalized_value.append(
+                normalize_value(expected_value[i], value[i], '{0}[{1}]'.format(key, i)))
+        return normalized_value
+
+    if isinstance(expected_value, dict):
+        if not isinstance(value, dict):
+            raise ModuleFailException(
+                'returned value {0} for {1} is not a dict'.format(value, key))
+        if len(expected_value) != len(value):
+            raise ModuleFailException(
+                'dict length mismatch for {0}'.format(key))
+
+        normalized_value = {}
+        for k in expected_value.keys():
+            n_k = normalize_value(k, k, '{0}[{1}]'.format(key, k))
+            if n_k not in value:
+                raise ModuleFailException('missing {0} in value'.format(n_k))
+            normalized_value[n_k] = normalize_value(expected_value[k], value[k], '{0}[{1}]'.format(key, k))
+        return normalized_value
+
+    if HAVE_UNICODE:
+        if isinstance(expected_value, unicode) and isinstance(value, str):
+            return value.decode('utf-8')
+        if isinstance(expected_value, str) and isinstance(value, unicode):
+            return value.encode('utf-8')
+    else:
+        if hasattr(expected_value, 'encode') and hasattr(value, 'decode'):
+            return value.decode('utf-8')
+        if hasattr(expected_value, 'decode') and hasattr(value, 'encode'):
+            return value.encode('utf-8')
+
+    return value

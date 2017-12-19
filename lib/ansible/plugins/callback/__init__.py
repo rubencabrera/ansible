@@ -70,7 +70,7 @@ class CallbackBase(AnsiblePlugin):
             name = getattr(self, 'CALLBACK_NAME', 'unnamed')
             ctype = getattr(self, 'CALLBACK_TYPE', 'old')
             version = getattr(self, 'CALLBACK_VERSION', '1.0')
-            self._display.vvvv('Loading callback plugin %s of type %s, v%s from %s' % (name, ctype, version, __file__))
+            self._display.vvvv('Loading callback plugin %s of type %s, v%s from %s' % (name, ctype, version, sys.modules[self.__module__].__file__))
 
         self.disabled = False
 
@@ -236,9 +236,7 @@ class CallbackBase(AnsiblePlugin):
     def _clean_results(self, result, task_name):
         ''' removes data from results for display '''
         if task_name in ['debug']:
-            for remove_key in ('invocation'):
-                if remove_key in result:
-                    del result[remove_key]
+            result.pop('invocation', None)
 
     def set_play_context(self, play_context):
         pass

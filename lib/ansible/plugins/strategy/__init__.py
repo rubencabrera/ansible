@@ -813,7 +813,7 @@ class StrategyBase:
                         for task in block.block:
                             result = self._do_handler_run(
                                 handler=task,
-                                handler_name=None,
+                                handler_name=task.get_name(),
                                 iterator=iterator,
                                 play_context=play_context,
                                 notified_hosts=included_file._hosts[:],
@@ -913,8 +913,12 @@ class StrategyBase:
                 play_context.set_options_from_plugin(connection)
 
             if connection:
-                connection.reset()
-                msg = 'reset connection'
+                try:
+                    connection.reset()
+                    msg = 'reset connection'
+                except ConnectionError as e:
+                    # most likely socket is already closed
+                    display.debug("got an error while closing persistent connection: %s" % e)
             else:
                 msg = 'no connection, nothing to reset'
         else:

@@ -1278,9 +1278,8 @@ class AnsibleModule(object):
                         if rc != 0 or err:
                             raise Exception("Error while setting attributes: %s" % (out + err))
                     except Exception as e:
-                        path = to_text(b_path)
-                        self.fail_json(path=path, msg='chattr failed', details=to_native(e),
-                                       exception=traceback.format_exc())
+                        self.fail_json(path=to_text(b_path), msg='chattr failed',
+                                       details=to_native(e), exception=traceback.format_exc())
         return changed
 
     def get_file_attributes(self, path):
@@ -1291,7 +1290,7 @@ class AnsibleModule(object):
             try:
                 rc, out, err = self.run_command(attrcmd)
                 if rc == 0:
-                    res = out.split(' ')[0:2]
+                    res = out.split()
                     output['attr_flags'] = res[1].replace('-', '').strip()
                     output['version'] = res[0].strip()
                     output['attributes'] = format_attributes(output['attr_flags'])
@@ -1924,7 +1923,7 @@ class AnsibleModule(object):
             wanted = v.get('type', None)
             if wanted == 'dict' or (wanted == 'list' and v.get('elements', '') == 'dict'):
                 spec = v.get('options', None)
-                if spec is None or not params[k]:
+                if spec is None or k not in params or params[k] is None:
                     continue
 
                 self._options_context.append(k)
@@ -2391,8 +2390,7 @@ class AnsibleModule(object):
 
         # Set the attributes
         current_attribs = self.get_file_attributes(src)
-        current_attribs = current_attribs.get('attr_flags', [])
-        current_attribs = ''.join(current_attribs)
+        current_attribs = current_attribs.get('attr_flags', '')
         self.set_attributes_if_different(dest, current_attribs, True)
 
     def atomic_move(self, src, dest, unsafe_writes=False):

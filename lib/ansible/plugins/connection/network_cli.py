@@ -92,6 +92,8 @@ class Connection(ConnectionBase):
         self._terminal = None
         self._cliconf = None
 
+        self._ansible_playbook_pid = kwargs.get('ansible_playbook_pid')
+
         if self._play_context.verbosity > 3:
             logging.getLogger('paramiko').setLevel(logging.DEBUG)
 
@@ -105,6 +107,10 @@ class Connection(ConnectionBase):
             if name.startswith('_'):
                 raise AttributeError("'%s' object has no attribute '%s'" % (self.__class__.__name__, name))
             return getattr(self._cliconf, name)
+
+    def get_prompt(self):
+        """Returns the current prompt from the device"""
+        return self._matched_prompt
 
     def exec_command(self, cmd, in_data=None, sudoable=True):
         # this try..except block is just to handle the transition to supporting
@@ -216,7 +222,8 @@ class Connection(ConnectionBase):
         value to None and the _connected value to False
         '''
         ssh = connection_loader.get('ssh', class_only=True)
-        cp = ssh._create_control_path(self._play_context.remote_addr, self._play_context.port, self._play_context.remote_user)
+        cp = ssh._create_control_path(self._play_context.remote_addr, self._play_context.port, self._play_context.remote_user, self._play_context.connection,
+                                      self._ansible_playbook_pid)
 
         tmp_path = unfrackpath(C.PERSISTENT_CONTROL_PATH_DIR)
         socket_path = unfrackpath(cp % dict(directory=tmp_path))
